@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include <math.h>
+#include <omp.h>
+#include <png.h>
 #include "png_util.h"
 #define min(X,Y) ((X) < (Y) ? (X) : (Y))
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
@@ -20,9 +22,11 @@ void abort_(const char * s, ...)
 
 char ** process_img(char ** img, char ** output, image_size_t sz, int halfwindow, double thresh)
 {
+	#pragma omp parallel for
 	//Average Filter 
-	for(int c=0;c<sz.width;c++) 
 		for(int r=0;r<sz.height;r++)
+		for(int c=0;c<sz.width;c++)
+	
 		{
 			double count = 0;
 			double tot = 0;
@@ -34,7 +38,7 @@ char ** process_img(char ** img, char ** output, image_size_t sz, int halfwindow
 				}
 			output[r][c] = (int) (tot/count);
 		}
-
+	
 	//write debug image
 	//write_png_file("after_smooth.png",output[0],sz);
 
@@ -50,8 +54,9 @@ char ** process_img(char ** img, char ** output, image_size_t sz, int halfwindow
 	xfilter[0][2] = 1;
 	xfilter[1][2] = 2;
 	xfilter[2][2] = 1;
-	for(int i=0;i<3;i++) 
-		for(int j=0;j<3;j++)
+
+	for(int j=0;j<3;j++) 
+		for(int i=0;i<3;i++)
 			yfilter[j][i] = xfilter[i][j];
 
 	double * gradient = (double *) malloc(sz.width*sz.height*sizeof(double));
@@ -60,8 +65,9 @@ char ** process_img(char ** img, char ** output, image_size_t sz, int halfwindow
         	g_img[r] = &gradient[r*sz.width];
 
 	// Gradient filter
-        for(int c=1;c<sz.width-1;c++)
+	#pragma omp parallel for
         	for(int r=1;r<sz.height-1;r++)
+			for(int c=1;c<sz.width-1;c++)
                 {
                         double Gx = 0;
 			double Gy = 0;
@@ -74,16 +80,18 @@ char ** process_img(char ** img, char ** output, image_size_t sz, int halfwindow
                         g_img[r][c] = sqrt(Gx*Gx+Gy*Gy);
                 }
 	
-
+	
 	// thresholding
-        for(int c=0;c<sz.width;c++)
+	#pragma omp parallel for
+	
         	for(int r=0;r<sz.height;r++)
+			for(int c=0;c<sz.width;c++)
 			if (g_img[r][c] > thresh)
 				output[r][c] = 255;
 			else
 				output[r][c] = 0;
-}
-
+	}
+	
 
 
 int main(int argc, char **argv)
